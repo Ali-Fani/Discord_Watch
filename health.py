@@ -117,11 +117,42 @@ async def get_voice_activity(
         # Build the query
         query = {}
         if server:
-            query["server_id"] = server
+            # Handle both string and integer server IDs
+            try:
+                query["server_id"] = int(server)
+            except ValueError:
+                query["server_id"] = server
+                
         if user:
-            query["user_id"] = int(user)  # Convert to int since Discord uses integer IDs
+            # Handle both string and integer user IDs
+            try:
+                query["user_id"] = int(user)
+            except ValueError:
+                query["user_id"] = user
+                
         if event:
             query["event_type"] = event
+            
+        # Add date range filter if provided
+        if start:
+            try:
+                start_date = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                if not query.get("event_time"):
+                    query["event_time"] = {}
+                query["event_time"]["$gte"] = start_date
+            except ValueError:
+                logger.error(f"Invalid start date format: {start}")
+                
+        if end:
+            try:
+                end_date = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                if not query.get("event_time"):
+                    query["event_time"] = {}
+                query["event_time"]["$lte"] = end_date
+            except ValueError:
+                logger.error(f"Invalid end date format: {end}")
+                
+        logger.info(f"Final query: {query}")
             
         # For debugging, let's log some sample documents first
         sample_doc = await health_check.mongo_client.discord_watch.voice_activity.find_one()
