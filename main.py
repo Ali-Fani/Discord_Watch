@@ -168,41 +168,25 @@ async def on_member_update(before, after):
         )
         logger.info(f'Member {after} updated in server {after.guild.name}')
 
-# Store last notification time for each user
-last_notification_time = {}
-
 # Helper function to send notifications about a watched user
 async def send_watched_user_notification(user_id: int, message: str):
     try:
-        # Check if we've sent a notification recently (within 5 seconds)
-        current_time = datetime.datetime.now()
-        if user_id in last_notification_time:
-            time_diff = (current_time - last_notification_time[user_id]).total_seconds()
-            if time_diff < 5:  # Prevent duplicate notifications within 5 seconds
-                logger.info(f"Skipping duplicate notification for user {user_id} (sent {time_diff} seconds ago)")
-                return
-
-        # Get unique notification channels for this user
-        notification_channels = {}
-        async for pref in client.db.notification_preferences.find({'watched_users': str(user_id)}):
-            channels = pref.get('notification_channels', {})
+        # Find notification preferences for this user
+        pref = await client.db.notification_preferences.find_one({'watched_users': str(user_id)})
+        
+        if pref:
+            notifications = {}
             
             # Add Discord notifications if configured
-            if 'discord_id' in channels and channels['discord_id'] not in notification_channels.get('discord', []):
-                notification_channels.setdefault('discord', []).append(channels['discord_id'])
+            if 'discord_id' in pref.get('notification_channels', {}):
+                notifications['discord'] = pref['notification_channels']['discord_id']
                 
             # Add Telegram notifications if configured
-            if 'telegram_id' in channels and channels['telegram_id'] not in notification_channels.get('telegram', []):
-                notification_channels.setdefault('telegram', []).append(channels['telegram_id'])
-
-        # Send to each unique channel
-        if notification_channels:
-            for provider, user_ids in notification_channels.items():
-                for target_id in user_ids:
-                    await client.notification_manager.send_notification(provider, target_id, message)
-            
-            # Update last notification time
-            last_notification_time[user_id] = current_time
+            if 'telegram_id' in pref.get('notification_channels', {}):
+                notifications['telegram'] = pref['notification_channels']['telegram_id']
+                
+            if notifications:
+                await client.notification_manager.send_notification_all(notifications, message)
                 
     except Exception as e:
         logger.error(f"Failed to send notification for user {user_id}: {str(e)}")
