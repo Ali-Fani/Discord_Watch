@@ -210,16 +210,8 @@ async def send_watched_user_notification(user_id: int, message: str):
 @client.event
 async def on_presence_update(before, after):
     """Handle presence updates for watched users"""
-    # Only proceed if there's an actual status change
-    if str(before.status) == str(after.status):
-        return
-        
-    # Check if this user is being watched
-    count = await client.db.notification_preferences.count_documents({'watched_users': str(after.id)})
-    if count > 0:
-        status_emoji = "🟢" if str(after.status) == "online" else "⭕"
-        message = f"{status_emoji} User {after.name} is now {after.status}"
-        await send_watched_user_notification(after.id, message)
+    # Presence notifications disabled
+    pass
 
 # Enhance on_voice_state_update to track mute and deafen changes and notify about watched users
 @client.event
