@@ -1,0 +1,16 @@
+[project]
+name = "discord-watch"
+version = "0.1.0"
+description = "Discord bot for monitoring voice activity and member information"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiologger>=0.7.0",
+    "motor>=3.3.2",
+    "discord-py>=2.5.2",
+    "python-dotenv>=1.1.1",
+    "dnspython>=2.4.2",
+    "python-telegram-bot>=22.3",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.1",
+]

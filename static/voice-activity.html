@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Watch - Voice Activity Logs</title>
+    <style>
+        :root {
+            --discord-dark: #36393F;
+            --discord-darker: #2F3136;
+            --discord-darkest: #202225;
+            --discord-light: #B9BBBE;
+            --discord-lighter: #DCDDDE;
+            --discord-accent: #7289DA;
+            --discord-green: #43B581;
+            --discord-red: #F04747;
+            --discord-yellow: #FAA61A;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--discord-darkest);
+            color: var(--discord-lighter);
+        }
+
+        .navbar {
+            background-color: var(--discord-darker);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .navbar h1 {
+            margin: 0;
+            color: var(--discord-accent);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .filters {
+            background-color: var(--discord-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 0.5rem;
+            color: var(--discord-light);
+        }
+
+        select, input {
+            background-color: var(--discord-darker);
+            border: 1px solid var(--discord-darkest);
+            color: var(--discord-lighter);
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .activity-list {
+            background-color: var(--discord-dark);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .activity-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--discord-darker);
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-item:hover {
+            background-color: var(--discord-darker);
+        }
+
+        .timestamp {
+            color: var(--discord-light);
+            font-size: 0.9em;
+        }
+
+        .event-type {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .event-join { background-color: var(--discord-green); }
+        .event-leave { background-color: var(--discord-red); }
+        .event-mute { background-color: var(--discord-yellow); }
+        .event-unmute { background-color: var(--discord-accent); }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--discord-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--discord-light);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--discord-dark);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: var(--discord-accent);
+        }
+
+        .stat-label {
+            color: var(--discord-light);
+            font-size: 0.9em;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .pagination button {
+            background-color: var(--discord-dark);
+            border: 1px solid var(--discord-accent);
+            color: var(--discord-lighter);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .pagination button:hover {
+            background-color: var(--discord-accent);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .activity-item {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>Voice Activity Logs</h1>
+        <select id="refreshRate">
+            <option value="0">Manual refresh</option>
+            <option value="5000">5 seconds</option>
+            <option value="10000">10 seconds</option>
+            <option value="30000" selected>30 seconds</option>
+            <option value="60000">1 minute</option>
+        </select>
+    </nav>
+
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label for="serverFilter">Server</label>
+                <select id="serverFilter">
+                    <option value="">All Servers</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="userFilter">User</label>
+                <select id="userFilter">
+                    <option value="">All Users</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="eventFilter">Event Type</label>
+                <select id="eventFilter">
+                    <option value="">All Events</option>
+                    <option value="join">Join</option>
+                    <option value="leave">Leave</option>
+                    <option value="mute">Mute</option>
+                    <option value="unmute">Unmute</option>
+                    <option value="deafen">Deafen</option>
+                    <option value="undeafen">Undeafen</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="dateRange">Date Range</label>
+                <input type="date" id="startDate">
+                <input type="date" id="endDate">
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">0</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalSessions">0</div>
+                <div class="stat-label">Voice Sessions Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeNow">0</div>
+                <div class="stat-label">Currently Active</div>
+            </div>
+        </div>
+
+        <div class="activity-list" id="activityList">
+            <div class="loading">Loading voice activity logs...</div>
+        </div>
+
+        <div class="pagination">
+            <button id="prevPage" disabled>Previous</button>
+            <button id="nextPage">Next</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let refreshInterval;
+
+        // Initialize date filters to last 24 hours
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+        document.getElementById('startDate').valueAsDate = yesterday;
+        document.getElementById('endDate').valueAsDate = now;
+
+        function formatDate(dateStr) {
+            try {
+                return new Date(dateStr).toLocaleString();
+            } catch (e) {
+                console.error('Error formatting date:', dateStr, e);
+                return 'Invalid date';
+            }
+        }
+
+        function getInitials(username) {
+            if (!username) return '??';
+            return username
+                .split(/\s+/)
+                .map(word => word[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2);
+        }
+
+        function getEventEmoji(eventType) {
+            const emojis = {
+                'join': '🎙️',
+                'leave': '🔇',
+                'mute': '🔇',
+                'unmute': '🔊',
+                'deafen': '🔕',
+                'undeafen': '🔔'
+            };
+            return emojis[eventType] || '❓';
+        }
+
+        function createActivityItem(activity) {
+            console.log('Creating activity item:', activity); // Debug log
+            
+            const eventEmoji = getEventEmoji(activity.event_type);
+            const channelInfo = activity.channel_name ? 
+                `in #${activity.channel_name}` : 
+                'in Unknown Channel';
+            const serverInfo = activity.server_name ?
+                `(${activity.server_name})` :
+                '(Unknown Server)';
+            
+            return `
+                <div class="activity-item">
+                    <div class="user-info">
+                        <div class="user-avatar">${getInitials(activity.username)}</div>
+                        <div>
+                            <div>${activity.username || 'Unknown User'}</div>
+                            <div class="timestamp">${formatDate(activity.event_time)}</div>
+                        </div>
+                    </div>
+                    <div>
+                        ${channelInfo}
+                        <small>${serverInfo}</small>
+                    </div>
+                    <div class="event-type event-${activity.event_type}">
+                        ${eventEmoji} ${activity.event_type}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchActivityLogs() {
+            const serverFilter = document.getElementById('serverFilter').value;
+            const userFilter = document.getElementById('userFilter').value;
+            const eventFilter = document.getElementById('eventFilter').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            try {
+                // Show loading state
+                document.getElementById('activityList').innerHTML = '<div class="loading">Loading voice activity logs...</div>';
+
+                const params = new URLSearchParams({
+                    page: currentPage.toString()
+                });
+
+                // Only add filters if they have values
+                if (serverFilter) params.append('server', serverFilter);
+                if (userFilter) params.append('user', userFilter);
+                if (eventFilter) params.append('event', eventFilter);
+                if (startDate) params.append('start', startDate);
+                if (endDate) params.append('end', endDate);
+
+                console.log('Fetching with params:', params.toString()); // Debug log
+
+                const response = await fetch(`/api/voice-activity?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Received data:', data); // Debug log
+                
+                // Update stats
+                document.getElementById('totalUsers').textContent = data.stats.totalUsers ?? 0;
+                document.getElementById('totalSessions').textContent = data.stats.totalSessions ?? 0;
+                document.getElementById('activeNow').textContent = data.stats.activeNow ?? 0;
+
+                // Update activity list
+                const activityList = document.getElementById('activityList');
+                if (!data.activities || data.activities.length === 0) {
+                    activityList.innerHTML = '<div class="loading">No activity logs found</div>';
+                } else {
+                    const activitiesHtml = data.activities
+                        .map(activity => {
+                            try {
+                                return createActivityItem(activity);
+                            } catch (e) {
+                                console.error('Error creating activity item:', e, activity);
+                                return '';
+                            }
+                        })
+                        .join('');
+                    activityList.innerHTML = activitiesHtml || '<div class="loading">Error displaying activities</div>';
+                }
+
+                // Update pagination
+                document.getElementById('prevPage').disabled = currentPage === 1;
+                document.getElementById('nextPage').disabled = !data.activities || data.activities.length < 50;
+            } catch (error) {
+                console.error('Failed to fetch activity logs:', error);
+                document.getElementById('activityList').innerHTML = 
+                    `<div class="loading">Failed to load activity logs: ${error.message}</div>`;
+            }
+        }
+
+        function updateRefreshInterval() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            const interval = parseInt(document.getElementById('refreshRate').value);
+            if (interval > 0) {
+                refreshInterval = setInterval(fetchActivityLogs, interval);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('refreshRate').addEventListener('change', updateRefreshInterval);
+        document.getElementById('serverFilter').addEventListener('change', () => {
+            currentPage = 1;
+            fetchActivityLogs();
+        });
+        document.getElementById('userFilter').addEventListener('change', () => {
+            currentPage = 1;
+            fetchActivityLogs();
+        });
+        document.getElementById('eventFilter').addEventListener('change', () => {
+            currentPage = 1;
+            fetchActivityLogs();
+        });
+        document.getElementById('startDate').addEventListener('change', () => {
+            currentPage = 1;
+            fetchActivityLogs();
+        });
+        document.getElementById('endDate').addEventListener('change', () => {
+            currentPage = 1;
+            fetchActivityLogs();
+        });
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchActivityLogs();
+            }
+        });
+        document.getElementById('nextPage').addEventListener('click', () => {
+            currentPage++;
+            fetchActivityLogs();
+        });
+
+        // Initial load
+        fetchActivityLogs();
+        updateRefreshInterval();
+
+        // Populate server and user filters
+        async function fetchFilters() {
+            try {
+                const response = await fetch('/api/voice-activity/filters');
+                const data = await response.json();
+                
+                const serverSelect = document.getElementById('serverFilter');
+                const userSelect = document.getElementById('userFilter');
+                
+                data.servers.forEach(server => {
+                    const option = new Option(server.name, server.id);
+                    serverSelect.add(option);
+                });
+                
+                data.users.forEach(user => {
+                    const option = new Option(user.name, user.id);
+                    userSelect.add(option);
+                });
+            } catch (error) {
+                console.error('Failed to fetch filters:', error);
+            }
+        }
+
+        fetchFilters();
+    </script>
+</body>
+</html>

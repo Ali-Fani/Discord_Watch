@@ -1,0 +1,75 @@
+2025-08-17 11:17:45,971 - INFO - logging in using static token
+2025-08-17 11:17:48,706 - INFO - Shard ID None has connected to Gateway (Session ID: e6fa2a80e5864e75f4abc57643aec219).
+2025-08-17 11:17:50,296 - INFO - alifani joined General at 2025-08-17 11:17:50.296792
+2025-08-17 11:17:50,720 - INFO - We have logged in as Watch#5598
+2025-08-17 11:18:05,227 - INFO - alifani left channel General after 0:00:14.930349
+2025-08-17 11:20:54,783 - INFO - logging in using static token
+2025-08-17 11:21:54,850 - INFO - Shard ID None has connected to Gateway (Session ID: 7a5f79dfc8eb1404e41105f601238236).
+2025-08-17 11:21:56,853 - INFO - We have logged in as Watch#5598
+2025-08-17 11:24:17,723 - INFO - logging in using static token
+2025-08-17 11:24:20,355 - INFO - Shard ID None has connected to Gateway (Session ID: 0ff8fe3d9079de712808274c7e9c6822).
+2025-08-17 11:24:21,722 - INFO - alifani joined General at 2025-08-17 11:24:21.722043
+2025-08-17 11:24:21,722 - ERROR - Ignoring exception in on_voice_state_update
+Traceback (most recent call last):
+  File "C:\Users\ALIFA\Documents\Discord_Watch\.venv\Lib\site-packages\discord\client.py", line 481, in _run_event
+    await coro(*args, **kwargs)
+  File "C:\Users\ALIFA\Documents\Discord_Watch\main.py", line 88, in on_voice_state_update
+    cursor.execute('''
+    ~~~~~~~~~~~~~~^^^^
+    INSERT INTO voice_activity (user_id, channel_id, join_time, username, is_muted, is_deafened)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    VALUES (?, ?, ?, ?, ?, ?)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ''', (user_id, after.channel.id, now, username, int(after.self_mute), int(after.self_deaf)))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: table voice_activity has no column named username
+2025-08-17 11:24:22,356 - INFO - We have logged in as Watch#5598
+2025-08-17 11:24:31,222 - INFO - logging in using static token
+2025-08-17 11:24:33,582 - INFO - Shard ID None has connected to Gateway (Session ID: 17a74ddb1bec931da2450b087042ada0).
+2025-08-17 11:24:35,236 - INFO - alifani joined General at 2025-08-17 11:24:35.236904
+2025-08-17 11:24:35,598 - INFO - We have logged in as Watch#5598
+2025-08-17 11:24:40,619 - INFO - alifani left channel General after 0:00:05.382875
+2025-08-17 11:24:48,855 - INFO - alifani joined General at 2025-08-17 11:24:48.854983
+2025-08-17 11:24:54,679 - INFO - alifani left channel General after 0:00:05.824682
+2025-08-17 11:26:18,785 - INFO - logging in using static token
+2025-08-17 11:26:21,279 - INFO - Shard ID None has connected to Gateway (Session ID: 0dbee7166753e12aa71acb9eed370b3e).
+2025-08-17 11:26:23,292 - INFO - We have logged in as Watch#5598
+2025-08-17 11:26:26,427 - INFO - alifani joined General at 2025-08-17 11:26:26.426967
+2025-08-17 11:26:30,114 - INFO - alifani muted themselves at 2025-08-17 11:26:30.114234
+2025-08-17 11:26:31,993 - INFO - alifani unmuted themselves at 2025-08-17 11:26:31.993412
+2025-08-17 11:26:33,574 - INFO - alifani muted themselves at 2025-08-17 11:26:33.574455
+2025-08-17 11:26:33,579 - INFO - alifani deafened themselves at 2025-08-17 11:26:33.574455
+2025-08-17 11:26:37,577 - INFO - alifani unmuted themselves at 2025-08-17 11:26:37.577123
+2025-08-17 11:26:37,582 - INFO - alifani undeafened themselves at 2025-08-17 11:26:37.577123
+2025-08-17 11:26:38,115 - INFO - alifani left channel General after 0:00:11.688881
+2025-08-17 11:30:01,918 - INFO - logging in using static token
+2025-08-17 11:30:06,033 - INFO - Shard ID None has connected to Gateway (Session ID: 1f44065ff02d30f7d9ae278c6b3fa0e4).
+2025-08-17 11:30:08,041 - INFO - We have logged in as Watch#5598
+2025-08-17 11:30:10,832 - INFO - alifani joined General at 2025-08-17 11:30:10.832086
+2025-08-17 11:30:16,028 - INFO - alifani muted themselves at 2025-08-17 11:30:16.028039
+2025-08-17 11:30:17,328 - INFO - alifani unmuted themselves at 2025-08-17 11:30:17.327988
+2025-08-17 11:30:18,428 - INFO - alifani muted themselves at 2025-08-17 11:30:18.428168
+2025-08-17 11:30:18,436 - INFO - alifani deafened themselves at 2025-08-17 11:30:18.428168
+2025-08-17 11:30:19,348 - INFO - alifani unmuted themselves at 2025-08-17 11:30:19.348325
+2025-08-17 11:30:19,354 - INFO - alifani undeafened themselves at 2025-08-17 11:30:19.348325
+2025-08-17 11:30:20,527 - INFO - alifani left channel General after 0:00:09.695007
+2025-08-17 11:36:09,265 - INFO - logging in using static token
+2025-08-17 11:36:11,957 - INFO - Shard ID None has connected to Gateway (Session ID: 79e2e627a9badc97038aad699c8ccc48).
+2025-08-17 11:36:13,979 - INFO - We have logged in as Watch#5598
+2025-08-17 11:36:14,311 - INFO - alifani muted themselves at 2025-08-17 11:36:14.311074
+2025-08-17 11:36:14,847 - INFO - alifani unmuted themselves at 2025-08-17 11:36:14.847263
+2025-08-17 11:36:15,322 - INFO - alifani muted themselves at 2025-08-17 11:36:15.322351
+2025-08-17 11:36:15,324 - INFO - alifani deafened themselves at 2025-08-17 11:36:15.322351
+2025-08-17 11:36:15,858 - INFO - alifani unmuted themselves at 2025-08-17 11:36:15.858068
+2025-08-17 11:36:15,861 - INFO - alifani undeafened themselves at 2025-08-17 11:36:15.858068
+2025-08-17 11:36:32,185 - INFO - logging in using static token
+2025-08-17 11:36:34,578 - INFO - Shard ID None has connected to Gateway (Session ID: bfa5167a238a2fb29738fe63eb440929).
+2025-08-17 11:36:34,645 - INFO - alifani joined General at 2025-08-17 11:36:34.644975
+2025-08-17 11:36:36,590 - INFO - We have logged in as Watch#5598
+2025-08-17 11:36:37,168 - INFO - alifani muted themselves at 2025-08-17 11:36:37.167988
+2025-08-17 11:36:38,043 - INFO - alifani unmuted themselves at 2025-08-17 11:36:38.042966
+2025-08-17 11:36:38,558 - INFO - alifani muted themselves at 2025-08-17 11:36:38.558001
+2025-08-17 11:36:38,563 - INFO - alifani deafened themselves at 2025-08-17 11:36:38.558001
+2025-08-17 11:36:39,492 - INFO - alifani unmuted themselves at 2025-08-17 11:36:39.491992
+2025-08-17 11:36:39,497 - INFO - alifani undeafened themselves at 2025-08-17 11:36:39.491992
+2025-08-17 11:36:41,296 - INFO - alifani left channel General after 0:00:06.651157
