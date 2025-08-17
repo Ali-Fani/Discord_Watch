@@ -54,7 +54,6 @@ def get_database():
             retryWrites=True,
             # Add TLS/SSL options required by Atlas
             tls=True,
-            tlsAllowInvalidCertificates=False
         )
         
         logger.info("Initializing MongoDB Atlas connection pool")
