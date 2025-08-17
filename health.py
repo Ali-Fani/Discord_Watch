@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import pathlib
-from typing import Dict, List, Optional
+from typing import Dict
 from datetime import datetime, timedelta
 import logging
-from motor.motor_asyncio import AsyncIOMotorClient
+
 
 app = FastAPI()
 logger = logging.getLogger("discord_bot")
