@@ -209,24 +209,61 @@ async def get_voice_activity(
 async def get_voice_activity_filters():
     """Get available filter options for voice activity"""
     try:
-        # Get unique servers
+        logger.info("Fetching voice activity filters...")
+        
+        # Get unique servers with valid names
         servers = []
-        async for doc in health_check.mongo_client.discord_watch.voice_activity.aggregate([
-            {"$group": {"_id": "$server_id", "name": {"$first": "$server_name"}}}
-        ]):
-            servers.append({"id": doc["_id"], "name": doc["name"]})
+        server_pipeline = [
+            {
+                "$match": {
+                    "server_name": {"$ne": None}  # Only include documents with non-null server names
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$server_id",
+                    "name": {"$first": "$server_name"}
+                }
+            }
+        ]
+        logger.info("Running server aggregation pipeline...")
+        async for doc in health_check.mongo_client.discord_watch.voice_activity.aggregate(server_pipeline):
+            if doc["_id"] is not None and doc["name"]:  # Only add if both id and name are valid
+                servers.append({"id": doc["_id"], "name": doc["name"]})
+        logger.info(f"Found {len(servers)} unique servers")
 
-        # Get unique users
+        # Get unique users with valid names
         users = []
-        async for doc in health_check.mongo_client.discord_watch.voice_activity.aggregate([
-            {"$group": {"_id": "$user_id", "name": {"$first": "$username"}}}
-        ]):
-            users.append({"id": doc["_id"], "name": doc["name"]})
+        user_pipeline = [
+            {
+                "$match": {
+                    "username": {"$ne": None}  # Only include documents with non-null usernames
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$user_id",
+                    "name": {"$first": "$username"}
+                }
+            }
+        ]
+        logger.info("Running user aggregation pipeline...")
+        async for doc in health_check.mongo_client.discord_watch.voice_activity.aggregate(user_pipeline):
+            if doc["_id"] is not None and doc["name"]:  # Only add if both id and name are valid
+                users.append({"id": doc["_id"], "name": doc["name"]})
+        logger.info(f"Found {len(users)} unique users")
 
-        return {
-            "servers": sorted(servers, key=lambda x: x["name"]),
-            "users": sorted(users, key=lambda x: x["name"])
+        # Handle None values in sorting
+        def safe_sort_key(x):
+            return x.get("name") or ""  # Return empty string if name is None
+            
+        response = {
+            "servers": sorted(servers, key=safe_sort_key),
+            "users": sorted(users, key=safe_sort_key)
         }
+        
+        logger.info(f"Returning filters: {response}")
+        return response
 
     except Exception as e:
         logger.error(f"Failed to fetch voice activity filters: {str(e)}")

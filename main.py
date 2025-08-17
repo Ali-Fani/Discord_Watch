@@ -194,14 +194,20 @@ async def send_watched_user_notification(user_id: int, message: str):
 @client.event
 async def on_presence_update(before, after):
     """Handle presence updates for watched users"""
-    # Check if this user is being watched
-    pref = await client.db.notification_preferences.find_one({'watched_users': str(after.id)})
+    # Only proceed if there's an actual status change
+    if str(before.status) == str(after.status):
+        return
+        
+    # Get all notification preferences for this user
+    cursor = client.db.notification_preferences.find({'watched_users': str(after.id)})
+    notification_sent = False
     
-    if pref:
-        # Check for online status change
-        if str(before.status) != str(after.status):
+    async for pref in cursor:
+        if not notification_sent:
+            # Only send the notification once, regardless of how many servers are watching
             message = f"🟢 User {after.name} is now {after.status}"
             await send_watched_user_notification(after.id, message)
+            notification_sent = True
 
 # Enhance on_voice_state_update to track mute and deafen changes and notify about watched users
 @client.event
