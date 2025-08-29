@@ -1,4 +1,4 @@
-from .base import NotificationProvider
+from .base import NotificationProvider, UserContext
 from .discord_provider import DiscordNotificationProvider
 from .telegram_provider import TelegramNotificationProvider
 from .manager import NotificationManager
@@ -8,4 +8,5 @@ __all__ = [
     'DiscordNotificationProvider',
     'TelegramNotificationProvider',
     'NotificationManager',
+    'UserContext',
 ]
