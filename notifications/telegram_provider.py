@@ -145,7 +145,12 @@ class TelegramNotificationProvider(NotificationProvider):
 
         return sanitized
 
-    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None) -> bool:
+    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None, voice_channel_id: Optional[int] = None, server_id: Optional[int] = None) -> bool:
+        """Send notification to Telegram user
+
+        Note: voice_channel_id and server_id parameters are ignored for Telegram
+        as it doesn't support clickable Discord voice channel links.
+        """
         if not self.bot:
             logger.error("Telegram bot not initialized")
             return False

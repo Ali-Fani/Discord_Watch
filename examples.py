@@ -157,6 +157,86 @@ async def demo_error_handling():
         action_type = infer_action_type(message)
         print(f"Unknown message: '{message}' → {action_type} (fallback)")
 
+async def demo_voice_channel_links():
+    """
+    Demonstrate clickable Discord voice channel links in notifications.
+    This is a new feature for the enhanced notification system.
+    """
+    print("🎙️ VOICE CHANNEL LINKS DEMONSTRATION")
+    print("=" * 50)
+
+    # Show the new functionality
+    print("📎 Clickable Voice Channel Links:")
+    print("✨ New: Voice channel notifications now include clickable links!")
+    print("   - Click the link to automatically join the voice channel")
+    print("   - Works with Discord desktop, mobile, and web clients")
+    print("   - Compatible with existing embed styling and colors")
+    print()
+
+    # Show URL format
+    print("🔗 URL Format:")
+    server_id = 123456789012345678
+    channel_id = 987654321098765432
+    example_url = f"https://discord.com/channels/{server_id}/{channel_id}"
+    print(f"Server ID: {server_id}")
+    print(f"Channel ID: {channel_id}")
+    print(f"Generated URL: {example_url}")
+    print()
+
+    # Show what notifications will look like
+    print("💬 Example Notification Messages:")
+    examples = [
+        {
+            "type": "Join",
+            "message": "🎙️ User TestUser joined voice channel General in server MyServer",
+            "color": "Green (#00FF00)",
+            "url": f"https://discord.com/channels/{server_id}/{channel_id}"
+        },
+        {
+            "type": "Leave",
+            "message": "🔇 User TestUser left voice channel Gaming in server MyServer",
+            "color": "Red (#FF0000)",
+            "url": f"https://discord.com/channels/{server_id}/{channel_id + 1}"
+        },
+        {
+            "type": "Move",
+            "message": "🔄 User TestUser moved from voice channel General to Music in server MyServer",
+            "color": "Blue (#0080FF)",
+            "url": f"https://discord.com/channels/{server_id}/{channel_id + 2}"
+        }
+    ]
+
+    for example in examples:
+        print(f"📍 {example['type']} Notification:")
+        print(f"   Message: {example['message']}")
+        print(f"   Embed Color: {example['color']}")
+        print(f"   Clickable Link: {example['url']}")
+        print(f"   → Opens Discord and joins the voice channel!")
+        print()
+
+    # Show embed structure
+    print("🗂️ Embed Structure with Voice Channel Link:")
+    print("┌─ Discord Embed ───────────────────────────────────────┐")
+    print("│ 🎙️ Voice Channel Join Notification                     │")
+    print("├─ Message ──────────────────────────────────────────────┤")
+    print("│ User TestUser joined voice channel General in server   │")
+    print("│ MyServer                                               │")
+    print("├─ Fields ──────────────────────────────────────────────┤")
+    print("│ 👤 User ID: `123456789`                                │")
+    print("│ 📅 Member Since: January 15, 2024                      │")
+    print("│ 🏷️ Roles: @Admin, @Moderator                          │")
+    print("➕ 🎙️ Voice Channel: [Join Voice Channel](URL)        │")
+    print("└─────────────────────────────────────────────────────────┘")
+    print("↑ Click the 'Join Voice Channel' link to automatically")
+    print("  open Discord and join that voice channel!")
+    print()
+
+    print("⚙️ Implementation Details:")
+    print("• Helper function: create_voice_channel_url(server_id, channel_id)")
+    print("• Enhanced DiscordNotificationProvider with voice channel support")
+    print("• Backward compatible - existing notifications remain unchanged")
+    print("• Automatic URL generation from server and channel IDs")
+    print()
 
 async def demo_integration_examples():
     """
@@ -224,6 +304,9 @@ async def main():
     print()
 
     await demo_error_handling()
+    print()
+
+    await demo_voice_channel_links()
     print()
 
     await demo_integration_examples()

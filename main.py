@@ -327,7 +327,7 @@ def update_channel_cache(user_id: int, channel_id: int, action: str):
         logger.error(f"Error updating channel cache for user {user_id}: {str(e)}")
 
 # Helper function to send notifications about a watched user
-async def send_watched_user_notification(user_id: int, message: str, action_type: str = None):
+async def send_watched_user_notification(user_id: int, message: str, action_type: str = None, voice_channel_id: int = None, server_id: int = None):
     try:
         # Find notification preferences for this user
         pref = await client.db.notification_preferences.find_one(
@@ -354,7 +354,7 @@ async def send_watched_user_notification(user_id: int, message: str, action_type
                     action_type = infer_action_type(message)
 
                 await client.notification_manager.send_notification_all(
-                    notifications, message, user_context, action_type
+                    notifications, message, user_context, action_type, voice_channel_id, server_id
                 )
 
     except Exception as e:
@@ -513,7 +513,7 @@ async def on_voice_state_update(member, before, after):
             else:
                 message = f"🎙️ User {username} joined voice channel {after_channel_name} in server {after_server_name}"
 
-            await send_watched_user_notification(user_id, message, ActionType.VOICE_JOIN)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_JOIN, after_channel_id, after_server_id)
 
         # Check if there are already watched users in this channel
         if watched_users_in_channel > 0 and not user_is_watched:
@@ -551,7 +551,7 @@ async def on_voice_state_update(member, before, after):
         )
         if pref:
             message = f"🔇 User {username} left voice channel {before_channel_name} in server {before_server_name}"
-            await send_watched_user_notification(user_id, message, ActionType.VOICE_LEAVE)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_LEAVE, before_channel_id, before_server_id)
 
         # Update channel cache if this was a watched user
         user_is_watched = await is_user_watched(user_id)
@@ -589,7 +589,7 @@ async def on_voice_state_update(member, before, after):
         )
         if pref:
             message = f"🔄 User {username} moved from voice channel {before_channel_name} to {after_channel_name} in server {after_server_name}"
-            await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE, after_channel_id, after_server_id)
 
         # Update channel cache for watched users
         user_is_watched = await is_user_watched(user_id)
@@ -602,7 +602,7 @@ async def on_voice_state_update(member, before, after):
             if watched_users_present:
                 others_text = ", ".join(watched_users_present)
                 message = f"👥 User {username} moved to voice channel {after_channel_name} in server {after_server_name}. In the same voice channel: {others_text}"
-                await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE)
+                await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE, after_channel_id, after_server_id)
 
     # Handle mute status changes
     if before.self_mute != after.self_mute:
