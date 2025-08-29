@@ -21,9 +21,25 @@ intents.presences = True  # Enable presence tracking
 load_dotenv()
 client = discord.Client(intents=intents)
 
+# Import notification components
+from notifications import (
+    NotificationManager,
+    DiscordNotificationProvider,
+    TelegramNotificationProvider,
+    UserContext,
+)
+
 # Presence state cache to prevent duplicate notifications
 # Maps user_id -> last_known_status
 presence_cache = {}
+
+# Voice channel state cache to prevent duplicate notifications
+# Maps user_id -> last_voice_state_signature (channel_id + timestamp)
+voice_state_cache = {}
+
+# Watched users currently in voice channels
+# Maps channel_id -> Set[UserID] for quick lookup of watched users in channels
+watched_channel_users = {}
 
 # Setup asynchronous logging using QueueHandler
 log_queue = SimpleQueue()
@@ -73,6 +89,54 @@ async def setup_database():
     logger.info("Database setup complete")
 
 
+# Helper functions for user context
+async def get_discord_user_context(user_id: int) -> UserContext:
+    """Get user context for Discord notifications"""
+    try:
+        # Fetch Discord user
+        discord_user = await client.fetch_user(user_id)
+        if not discord_user:
+            # Return basic context if user not found
+            return UserContext(
+                user_id=str(user_id),
+                username=f"User {user_id}",
+                display_name=f"User {user_id}"
+            )
+
+        # Get member data from database for guild-specific info
+        member_data = None
+        for guild in client.guilds:
+            member_doc = await client.db.members.find_one(
+                {"user_id": user_id, "server_id": guild.id}
+            )
+            if member_doc:
+                member_data = member_doc
+                break
+
+        return UserContext.from_discord_user(discord_user, member_data)
+
+    except Exception as e:
+        logger.error(f"Failed to get Discord user context for {user_id}: {e}")
+        # Return basic fallback context
+        return UserContext(
+            user_id=str(user_id),
+            username=f"User {user_id}",
+            display_name=f"User {user_id}"
+        )
+
+async def get_basic_user_context_for_telegram(user_id: str) -> UserContext:
+    """Get basic user context for Telegram notifications
+
+    Note: Telegram has limited user data access, so this is mostly
+    for consistency with the interface. Full user info would require
+    the user to have previously interacted with the bot.
+    """
+    return UserContext(
+        user_id=user_id,
+        username=f"User {user_id}",
+        display_name=f"User {user_id}"
+    )
+
 # Initialize the bot and database
 async def init():
     # Initialize MongoDB with connection pooling
@@ -86,12 +150,7 @@ async def init():
         logger.info("Successfully connected to MongoDB Atlas")
         await setup_database()
 
-        # Initialize notification system
-        from notifications import (
-            NotificationManager,
-            DiscordNotificationProvider,
-            TelegramNotificationProvider,
-        )
+        # Initialize notification system (imports already done at top)
 
         client.notification_manager = NotificationManager()
         # Register Discord notification provider
@@ -184,6 +243,87 @@ async def on_member_update(before, after):
         logger.info(f"Member {after} updated in server {after.guild.name}")
 
 
+# Helper function to get current watched users in a channel
+async def get_watched_users_in_channel(channel_id: int) -> list:
+    """Get list of watched users currently in a voice channel"""
+    return list(watched_channel_users.get(channel_id, set()))
+
+# Helper function to check if a user is being watched
+async def is_user_watched(user_id: int) -> bool:
+    """Check if a user is being watched in notification preferences"""
+    try:
+        pref = await client.db.notification_preferences.find_one(
+            {"watched_users": str(user_id)}
+        )
+        return pref is not None
+    except Exception as e:
+        logger.error(f"Error checking if user {user_id} is watched: {str(e)}")
+        return False
+
+# Helper function to get other users in a voice channel (excluding the joining user)
+async def get_other_users_in_channel(channel, exclude_user_id: int) -> tuple:
+    """Get information about other users in a channel, including watched status"""
+    if not channel:
+        return [], []
+
+    try:
+        members = channel.members
+        other_users = []
+        watched_users_present = []
+
+        for member in members:
+            if member.id != exclude_user_id:
+                other_users.append(str(member))
+
+                # Check if this other user is being watched
+                if await is_user_watched(member.id):
+                    watched_users_present.append(str(member))
+
+        return other_users, watched_users_present
+    except Exception as e:
+        logger.error(f"Error getting users in channel {channel.name}: {str(e)}")
+        return [], []
+
+# Helper function to create voice state signature for deduplication
+def get_voice_state_signature(user_id: int, channel_id: int, event_type: str) -> str:
+    """Create a signature for voice state changes to prevent duplicate notifications"""
+    return f"{user_id}:{channel_id}:{event_type}:{int(datetime.datetime.now().timestamp())}"
+
+# Helper function to manage watched users cache for channels
+def update_channel_cache(user_id: int, channel_id: int, action: str):
+    """Update the watched users cache for channels
+
+    Args:
+        user_id: The user ID
+        channel_id: The channel ID (can be None for leaving)
+        action: 'join', 'leave', or 'move'
+    """
+    try:
+        if action == 'leave' and channel_id is not None:
+            # Remove user from old channel
+            if channel_id in watched_channel_users:
+                watched_channel_users[channel_id].discard(user_id)
+                # Clean up empty sets
+                if not watched_channel_users[channel_id]:
+                    del watched_channel_users[channel_id]
+
+        elif action == 'join' and channel_id is not None:
+            # Add user to new channel
+            if channel_id not in watched_channel_users:
+                watched_channel_users[channel_id] = set()
+            watched_channel_users[channel_id].add(user_id)
+
+        elif action == 'move' and channel_id is not None:
+            # This should be handled by separate leave/join calls
+
+            # But as a fallback, ensure user is in correct channel
+            # We'll let the separate events handle this properly
+            pass
+
+        logger.debug(f"Updated channel cache for user {user_id}: action={action}, channel={channel_id}")
+    except Exception as e:
+        logger.error(f"Error updating channel cache for user {user_id}: {str(e)}")
+
 # Helper function to send notifications about a watched user
 async def send_watched_user_notification(user_id: int, message: str):
     try:
@@ -204,8 +344,10 @@ async def send_watched_user_notification(user_id: int, message: str):
                 notifications["telegram"] = pref["notification_channels"]["telegram_id"]
 
             if notifications:
+                # Get user context for enhanced notifications
+                user_context = await get_discord_user_context(user_id)
                 await client.notification_manager.send_notification_all(
-                    notifications, message
+                    notifications, message, user_context
                 )
 
     except Exception as e:
@@ -246,7 +388,7 @@ async def on_presence_update(before, after):
         )
 
 
-# Enhance on_voice_state_update to track mute and deafen changes and notify about watched users
+# Enhanced on_voice_state_update with comprehensive voice channel monitoring and notifications
 @client.event
 async def on_voice_state_update(member, before, after):
     user_id = member.id
@@ -267,6 +409,22 @@ async def on_voice_state_update(member, before, after):
         get_channel_and_server_info(after.channel)
     )
 
+    # Create voice state signature for deduplication
+    voice_signature = None
+    if after_channel_id:
+        voice_signature = get_voice_state_signature(user_id, after_channel_id, "join")
+    elif before_channel_id:
+        voice_signature = get_voice_state_signature(user_id, before_channel_id, "leave")
+
+    # Check for duplicate events using cache
+    if voice_signature and voice_signature == voice_state_cache.get(user_id):
+        logger.debug(f"Duplicate voice state update ignored for user {username} ({user_id})")
+        return
+
+    # Update cache with new signature
+    if voice_signature:
+        voice_state_cache[user_id] = voice_signature
+
     # Create voice activity document
     async def log_voice_activity(
         channel_id, channel_name, server_id, server_name, event_type
@@ -284,6 +442,33 @@ async def on_voice_state_update(member, before, after):
             }
         )
 
+    # Helper function to send notifications to all watchers of a specific watched user
+    async def send_notification_to_watchers(watched_user_id: int, message: str):
+        try:
+            pref = await client.db.notification_preferences.find_one(
+                {"watched_users": str(watched_user_id)}
+            )
+            if pref:
+                notifications = {}
+
+                # Add Discord notifications if configured
+                if "discord_id" in pref.get("notification_channels", {}):
+                    notifications["discord"] = pref["notification_channels"]["discord_id"]
+
+                # Add Telegram notifications if configured
+                if "telegram_id" in pref.get("notification_channels", {}):
+                    notifications["telegram"] = pref["notification_channels"]["telegram_id"]
+
+                if notifications:
+                    # Get user context for enhanced notifications
+                    user_context = await get_discord_user_context(watched_user_id)
+                    await client.notification_manager.send_notification_all(
+                        notifications, message, user_context
+                    )
+        except Exception as e:
+            logger.error(f"Failed to send notification for watched user {watched_user_id}: {str(e)}")
+
+    # Handle user joining a voice channel
     if before.channel is None and after.channel is not None:
         logger.info(f"{member} joined {after.channel} at {now}")
         await log_voice_activity(
@@ -294,14 +479,43 @@ async def on_voice_state_update(member, before, after):
             "join",
         )
 
+        # Get information about other users already in the channel
+        other_users, watched_users_present = await get_other_users_in_channel(after.channel, user_id)
+        watched_users_in_channel = len(watched_users_present)
+
         # Check if this user is being watched
-        pref = await client.db.notification_preferences.find_one(
-            {"watched_users": str(user_id)}
-        )
-        if pref:
-            message = f"🎙️ User {username} joined voice channel {after_channel_name} in server {after_server_name}"
+        user_is_watched = await is_user_watched(user_id)
+
+        if user_is_watched:
+            # This is a watched user joining - check for others present
+            if watched_users_present:
+                others_text = ", ".join(watched_users_present)
+                message = f"👥 User {username} joined voice channel {after_channel_name} in server {after_server_name}. In the same voice channel: {others_text}"
+            else:
+                message = f"🎙️ User {username} joined voice channel {after_channel_name} in server {after_server_name}"
+
             await send_watched_user_notification(user_id, message)
 
+        # Check if there are already watched users in this channel
+        if watched_users_in_channel > 0 and not user_is_watched:
+            # This is a non-watched user joining a channel with watched users
+            # Send notification to all watchers about this non-watched user joining
+            for watched_user_in_channel in await get_watched_users_in_channel(after_channel_id):
+                try:
+                    watched_pref = await client.db.notification_preferences.find_one(
+                        {"watched_users": str(watched_user_in_channel)}
+                    )
+                    if watched_pref:
+                        message = f"👤 User {username} joined voice channel {after_channel_name} in server {after_server_name}, where watched user is already present"
+                        await send_notification_to_watchers(watched_user_in_channel, message)
+                except Exception as e:
+                    logger.error(f"Error sending notification to watcher {watched_user_in_channel}: {str(e)}")
+
+        # Update channel cache if this is a watched user
+        if user_is_watched:
+            update_channel_cache(user_id, after_channel_id, 'join')
+
+    # Handle user leaving a voice channel
     elif before.channel is not None and after.channel is None:
         logger.info(f"{member} left channel {before.channel} at {now}")
         await log_voice_activity(
@@ -320,12 +534,20 @@ async def on_voice_state_update(member, before, after):
             message = f"🔇 User {username} left voice channel {before_channel_name} in server {before_server_name}"
             await send_watched_user_notification(user_id, message)
 
+        # Update channel cache if this was a watched user
+        user_is_watched = await is_user_watched(user_id)
+        if user_is_watched:
+            update_channel_cache(user_id, before_channel_id, 'leave')
+
+    # Handle user moving between voice channels
     elif (
         before.channel is not None
         and after.channel is not None
         and before.channel != after.channel
     ):
         logger.info(f"{member} moved from {before.channel} to {after.channel} at {now}")
+
+        # Log leave from old channel
         await log_voice_activity(
             before_channel_id,
             before_channel_name,
@@ -333,6 +555,7 @@ async def on_voice_state_update(member, before, after):
             before_server_name,
             "leave",
         )
+        # Log join to new channel
         await log_voice_activity(
             after_channel_id,
             after_channel_name,
@@ -341,6 +564,28 @@ async def on_voice_state_update(member, before, after):
             "join",
         )
 
+        # Check if this user is being watched
+        pref = await client.db.notification_preferences.find_one(
+            {"watched_users": str(user_id)}
+        )
+        if pref:
+            message = f"🔄 User {username} moved from voice channel {before_channel_name} to {after_channel_name} in server {after_server_name}"
+            await send_watched_user_notification(user_id, message)
+
+        # Update channel cache for watched users
+        user_is_watched = await is_user_watched(user_id)
+        if user_is_watched:
+            update_channel_cache(user_id, before_channel_id, 'leave')
+            update_channel_cache(user_id, after_channel_id, 'join')
+
+            # Check if the new channel has other watched users
+            other_users, watched_users_present = await get_other_users_in_channel(after.channel, user_id)
+            if watched_users_present:
+                others_text = ", ".join(watched_users_present)
+                message = f"👥 User {username} moved to voice channel {after_channel_name} in server {after_server_name}. In the same voice channel: {others_text}"
+                await send_watched_user_notification(user_id, message)
+
+    # Handle mute status changes
     if before.self_mute != after.self_mute:
         logger.info(
             f"{member} {'muted' if after.self_mute else 'unmuted'} themselves at {now}"
@@ -353,6 +598,7 @@ async def on_voice_state_update(member, before, after):
             "mute" if after.self_mute else "unmute",
         )
 
+    # Handle deafen status changes
     if before.self_deaf != after.self_deaf:
         logger.info(
             f"{member} {'deafened' if after.self_deaf else 'undeafened'} themselves at {now}"
