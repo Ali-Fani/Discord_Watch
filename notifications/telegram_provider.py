@@ -24,23 +24,30 @@ class TelegramNotificationProvider(NotificationProvider):
         logger.info("Telegram notification provider initialized")
 
     def _format_for_telegram(self, message: str, user_context: Optional[UserContext] = None) -> list:
-        """Escape message for HTML parse mode and split into safe chunks.
+        """Format message for Telegram HTML parse mode and split into safe chunks.
 
         Telegram message limit is ~4096 characters; use a conservative limit.
+        This method preserves HTML formatting tags while sanitizing user content.
         """
         SAFE_LIMIT = 4000
 
-        # Enhance message with user context if available
-        enhanced_message = self._enhance_telegram_message(message, user_context)
-        escaped = html.escape(enhanced_message, quote=False)  # Don't escape HTML we add
+        # Escape the original message content (user input) for safety
+        escaped_message = html.escape(message, quote=False)
 
-        if len(escaped) <= SAFE_LIMIT:
-            return [escaped]
+        # Enhance message with user context if available (adds HTML formatting)
+        enhanced_message = self._enhance_telegram_message(escaped_message, user_context)
+
+        # Sanitize the final HTML to ensure it's valid
+        sanitized_message = self._sanitize_telegram_html(enhanced_message)
+
+        # Do NOT escape the final sanitized message - preserve our HTML tags
+        if len(sanitized_message) <= SAFE_LIMIT:
+            return [sanitized_message]
 
         chunks = []
         idx = 0
-        while idx < len(escaped):
-            chunks.append(escaped[idx : idx + SAFE_LIMIT])
+        while idx < len(sanitized_message):
+            chunks.append(sanitized_message[idx : idx + SAFE_LIMIT])
             idx += SAFE_LIMIT
         return chunks
 
@@ -84,7 +91,61 @@ class TelegramNotificationProvider(NotificationProvider):
 
         return enhanced_message
 
-    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None) -> bool:
+    def _sanitize_telegram_html(self, html_content: str) -> str:
+        """Sanitize HTML content for Telegram to remove unsupported tags and fix common issues.
+
+        Telegram HTML supports: <b>, <i>, <u>, <s>, <code>, <pre>, <a>
+        """
+        import re
+
+        # Define supported HTML tags for Telegram
+        SUPPORTED_TAGS = {'b', 'i', 'u', 's', 'code', 'pre', 'a'}
+
+        def is_supported_tag(tag: str) -> bool:
+            """Check if a tag is supported by Telegram HTML"""
+            clean_tag = tag.lower().strip('<>/')
+            return clean_tag in SUPPORTED_TAGS
+
+        def replace_unsupported_tag(match):
+            """Replace unsupported HTML tags with plain text"""
+            full_match = match.group(0)
+            tag_content = match.group(2)
+
+            if is_supported_tag(match.group(1)):
+                # Supported tag - keep as is
+                return full_match
+            else:
+                # Unsupported tag - remove tags but keep content
+                logger.warning(f"Removing unsupported HTML tag '{match.group(1)}' in Telegram message")
+                return tag_content
+
+        # Remove unsupported tags while preserving content
+        # Pattern matches <tag>content</tag> where tag is the tag name
+        tag_pattern = r'<([^>]+)>(.*?)</\1>'
+        sanitized = re.sub(tag_pattern, replace_unsupported_tag, html_content, flags=re.DOTALL | re.IGNORECASE)
+
+        # Handle self-closing tags
+        self_closing_pattern = r'<([^>]+) */?>'
+        def replace_self_closing(match):
+            tag = match.group(1).split()[0]  # Get just the tag name, ignore attributes
+            if is_supported_tag(tag):
+                return match.group(0)  # Keep supported self-closing tags
+            else:
+                logger.warning(f"Removing unsupported self-closing HTML tag '{tag}' in Telegram message")
+                return ""  # Remove unsupported self-closing tags
+
+        sanitized = re.sub(self_closing_pattern, replace_self_closing, sanitized)
+
+        # Basic validation - ensure we don't have broken HTML structure
+        # Check for unclosed tags (simple heuristic)
+        open_count = sanitized.count('<') - sanitized.count('<a href=')  # <a> tags need special handling
+        close_count = sanitized.count('>')
+        if open_count * 2 != close_count:
+            logger.warning(f"Potential HTML structure issue detected in Telegram message: open_tags={open_count}, close_tags={close_count}")
+
+        return sanitized
+
+    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None) -> bool:
         if not self.bot:
             logger.error("Telegram bot not initialized")
             return False

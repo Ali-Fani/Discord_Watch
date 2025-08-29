@@ -2,6 +2,7 @@ from .base import NotificationProvider, UserContext
 from .discord_provider import DiscordNotificationProvider
 from .telegram_provider import TelegramNotificationProvider
 from .manager import NotificationManager
+from .config import ActionType, ColorConfig, infer_action_type
 
 __all__ = [
     'NotificationProvider',
@@ -9,4 +10,7 @@ __all__ = [
     'TelegramNotificationProvider',
     'NotificationManager',
     'UserContext',
+    'ActionType',
+    'ColorConfig',
+    'infer_action_type',
 ]

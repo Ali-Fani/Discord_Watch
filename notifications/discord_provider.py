@@ -1,4 +1,5 @@
 from .base import NotificationProvider, UserContext
+from .config import ColorConfig, infer_action_type
 import discord
 import logging
 from typing import List, Optional
@@ -14,12 +15,17 @@ class DiscordNotificationProvider(NotificationProvider):
         # No initialization needed for Discord as we're using the existing client
         pass
 
-    def _format_for_discord(self, message: str, user_context: Optional[UserContext] = None) -> dict:
+    def _format_for_discord(self, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None) -> dict:
         """Return a dict describing how to send the message on Discord.
 
         We prefer to send a single embed when the message fits. If the
         message is very long, split into chunks of safe size and send as
         plain messages.
+
+        Args:
+            message: The notification message
+            user_context: User context information for enhanced formatting
+            action_type: The type of action that triggered this notification
         """
         # Discord embed description limit is 4096; keep margin
         EMBED_LIMIT = 4000
@@ -27,7 +33,7 @@ class DiscordNotificationProvider(NotificationProvider):
         MESSAGE_LIMIT = 2000
 
         if len(message) <= EMBED_LIMIT:
-            embed = self._create_enhanced_embed(message, user_context)
+            embed = self._create_enhanced_embed(message, user_context, action_type)
             return {"embed": embed}
 
         # If it's too long for an embed, split into message-sized chunks
@@ -38,11 +44,28 @@ class DiscordNotificationProvider(NotificationProvider):
             idx += MESSAGE_LIMIT
         return {"chunks": chunks}
 
-    def _create_enhanced_embed(self, message: str, user_context: Optional[UserContext]) -> discord.Embed:
-        """Create an enhanced embed with user information"""
+    def _create_enhanced_embed(self, message: str, user_context: Optional[UserContext], action_type: Optional[str] = None) -> discord.Embed:
+        """Create an enhanced embed with user information and dynamic coloring
+
+        Args:
+            message: The main notification message
+            user_context: User context information for enhanced formatting
+            action_type: The type of action that triggered this notification (for color coding)
+        """
+        # Get color based on action type, with fallback to auto-inference
+        if action_type:
+            color = ColorConfig.get_color(action_type)
+        else:
+            color = ColorConfig.get_color(infer_action_type(message))
+
+        # Validate color and provide fallback if invalid
+        if not ColorConfig.validate_color(color):
+            logger.warning(f"Invalid color value {color} for action type {action_type}, using default")
+            color = ColorConfig.get_color("default")
+
         embed = discord.Embed(
             description=message,
-            color=0x00ff00,  # Green color for notifications
+            color=color,
             timestamp=discord.utils.utcnow()
         )
 
@@ -85,7 +108,7 @@ class DiscordNotificationProvider(NotificationProvider):
 
         return embed
 
-    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None) -> bool:
+    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None) -> bool:
         try:
             # Convert string user_id to int since Discord uses integers for IDs
             discord_user_id = int(user_id)
@@ -95,7 +118,7 @@ class DiscordNotificationProvider(NotificationProvider):
                 logger.warning(f"Could not find Discord user with ID {user_id}")
                 return False
 
-            formatted = self._format_for_discord(message, user_context)
+            formatted = self._format_for_discord(message, user_context, action_type)
 
             # Send as embed when available
             if "embed" in formatted and formatted["embed"] is not None:

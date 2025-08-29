@@ -27,6 +27,8 @@ from notifications import (
     DiscordNotificationProvider,
     TelegramNotificationProvider,
     UserContext,
+    ActionType,
+    infer_action_type,
 )
 
 # Presence state cache to prevent duplicate notifications
@@ -325,7 +327,7 @@ def update_channel_cache(user_id: int, channel_id: int, action: str):
         logger.error(f"Error updating channel cache for user {user_id}: {str(e)}")
 
 # Helper function to send notifications about a watched user
-async def send_watched_user_notification(user_id: int, message: str):
+async def send_watched_user_notification(user_id: int, message: str, action_type: str = None):
     try:
         # Find notification preferences for this user
         pref = await client.db.notification_preferences.find_one(
@@ -346,8 +348,13 @@ async def send_watched_user_notification(user_id: int, message: str):
             if notifications:
                 # Get user context for enhanced notifications
                 user_context = await get_discord_user_context(user_id)
+
+                # Infer action type from message if not provided
+                if action_type is None:
+                    action_type = infer_action_type(message)
+
                 await client.notification_manager.send_notification_all(
-                    notifications, message, user_context
+                    notifications, message, user_context, action_type
                 )
 
     except Exception as e:
@@ -380,7 +387,19 @@ async def on_presence_update(before, after):
         )
         if pref:
             message = f"👤 User {username} is now {new_status}"
-            await send_watched_user_notification(user_id, message)
+            # Determine action type based on status
+            if new_status.lower() == "online":
+                action_type = ActionType.STATUS_ONLINE
+            elif new_status.lower() == "offline":
+                action_type = ActionType.STATUS_OFFLINE
+            elif new_status.lower() == "idle":
+                action_type = ActionType.STATUS_IDLE
+            elif new_status.lower() == "dnd":
+                action_type = ActionType.STATUS_DND
+            else:
+                action_type = ActionType.STATUS_ONLINE  # fallback
+
+            await send_watched_user_notification(user_id, message, action_type)
     else:
         # This is a duplicate event, log it but don't send notification
         logger.debug(
@@ -494,7 +513,7 @@ async def on_voice_state_update(member, before, after):
             else:
                 message = f"🎙️ User {username} joined voice channel {after_channel_name} in server {after_server_name}"
 
-            await send_watched_user_notification(user_id, message)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_JOIN)
 
         # Check if there are already watched users in this channel
         if watched_users_in_channel > 0 and not user_is_watched:
@@ -532,7 +551,7 @@ async def on_voice_state_update(member, before, after):
         )
         if pref:
             message = f"🔇 User {username} left voice channel {before_channel_name} in server {before_server_name}"
-            await send_watched_user_notification(user_id, message)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_LEAVE)
 
         # Update channel cache if this was a watched user
         user_is_watched = await is_user_watched(user_id)
@@ -570,7 +589,7 @@ async def on_voice_state_update(member, before, after):
         )
         if pref:
             message = f"🔄 User {username} moved from voice channel {before_channel_name} to {after_channel_name} in server {after_server_name}"
-            await send_watched_user_notification(user_id, message)
+            await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE)
 
         # Update channel cache for watched users
         user_is_watched = await is_user_watched(user_id)
@@ -583,7 +602,7 @@ async def on_voice_state_update(member, before, after):
             if watched_users_present:
                 others_text = ", ".join(watched_users_present)
                 message = f"👥 User {username} moved to voice channel {after_channel_name} in server {after_server_name}. In the same voice channel: {others_text}"
-                await send_watched_user_notification(user_id, message)
+                await send_watched_user_notification(user_id, message, ActionType.VOICE_MOVE)
 
     # Handle mute status changes
     if before.self_mute != after.self_mute:

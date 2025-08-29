@@ -67,13 +67,14 @@ class NotificationProvider(ABC):
         pass
 
     @abstractmethod
-    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None) -> bool:
+    async def send_notification(self, user_id: str, message: str, user_context: Optional[UserContext] = None, action_type: Optional[str] = None) -> bool:
         """Send a notification to a user
 
         Args:
             user_id: The ID of the user to notify
             message: The message to send
             user_context: User context information for enhanced formatting
+            action_type: The type of action that triggered this notification (for color coding)
 
         Returns:
             bool: True if notification was sent successfully, False otherwise
