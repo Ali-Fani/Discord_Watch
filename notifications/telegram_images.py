@@ -388,3 +388,29 @@ class TelegramProfilePictureManager:
     async def close(self):
         """Clean up resources"""
         await self.http_client.aclose()
+
+    async def get_configuration_report(self) -> dict:
+        """Get a report of the current configuration for debugging"""
+        from .config import TelegramThumbnailConfig
+
+        cache_stats = await self.cache_manager.cleanup_cache()
+        cache_dir_size = 0
+
+        try:
+            cache_path = Path(TelegramThumbnailConfig.get_cache_dir())
+            if cache_path.exists():
+                # Get total size of all jpg files in cache
+                for jpg_file in cache_path.glob("*.jpg"):
+                    cache_dir_size += jpg_file.stat().st_size
+                cache_dir_size = cache_dir_size / (1024 * 1024)  # Convert to MB
+        except Exception:
+            pass
+
+        return {
+            "configuration": TelegramThumbnailConfig.get_config_report(),
+            "cache_stats": {
+                "current_size_mb": round(cache_dir_size, 2),
+                "max_size_mb": TelegramThumbnailConfig.get_cache_max_size_mb(),
+                "last_cleanup": cache_stats
+            }
+        }

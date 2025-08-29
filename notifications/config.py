@@ -187,7 +187,21 @@ class TelegramThumbnailConfig:
     Configuration class for Telegram profile picture thumbnail generation.
 
     All settings can be configured via environment variables for easy customization.
+    Default values are provided for all settings to ensure the system works out-of-the-box.
     """
+
+    # Default configuration values
+    _DEFAULTS = {
+        "THUMBNAIL_ENABLED": True,
+        "THUMBNAIL_WIDTH": 128,
+        "THUMBNAIL_HEIGHT": 128,
+        "THUMBNAIL_QUALITY": 85,
+        "CACHE_MAX_SIZE_MB": 500,
+        "CACHE_TTL_HOURS": 24.0,
+        "CACHE_DIR": "cache/thumbnails",
+        "SEND_THUMBNAIL_ON_ERROR": True,
+        "API_TIMEOUT": 10.0
+    }
 
     @classmethod
     def is_enabled(cls) -> bool:
@@ -198,47 +212,47 @@ class TelegramThumbnailConfig:
     def get_width(cls) -> int:
         """Get thumbnail width in pixels"""
         try:
-            return int(os.getenv("TELEGRAM_THUMBNAIL_WIDTH", "128"))
+            return int(os.getenv("TELEGRAM_THUMBNAIL_WIDTH", str(cls._DEFAULTS["THUMBNAIL_WIDTH"])))
         except ValueError:
-            return 128
+            return cls._DEFAULTS["THUMBNAIL_WIDTH"]
 
     @classmethod
     def get_height(cls) -> int:
         """Get thumbnail height in pixels"""
         try:
-            return int(os.getenv("TELEGRAM_THUMBNAIL_HEIGHT", "128"))
+            return int(os.getenv("TELEGRAM_THUMBNAIL_HEIGHT", str(cls._DEFAULTS["THUMBNAIL_HEIGHT"])))
         except ValueError:
-            return 128
+            return cls._DEFAULTS["THUMBNAIL_HEIGHT"]
 
     @classmethod
     def get_quality(cls) -> int:
         """Get JPEG quality (1-95, higher = better quality but larger file)"""
         try:
-            quality = int(os.getenv("TELEGRAM_THUMBNAIL_QUALITY", "85"))
+            quality = int(os.getenv("TELEGRAM_THUMBNAIL_QUALITY", str(cls._DEFAULTS["THUMBNAIL_QUALITY"])))
             return max(1, min(95, quality))  # Clamp between 1 and 95
         except ValueError:
-            return 85
+            return cls._DEFAULTS["THUMBNAIL_QUALITY"]
 
     @classmethod
     def get_cache_max_size_mb(cls) -> int:
         """Get maximum cache size in MB"""
         try:
-            return int(os.getenv("TELEGRAM_CACHE_MAX_SIZE_MB", "500"))
+            return int(os.getenv("TELEGRAM_CACHE_MAX_SIZE_MB", str(cls._DEFAULTS["CACHE_MAX_SIZE_MB"])))
         except ValueError:
-            return 500
+            return cls._DEFAULTS["CACHE_MAX_SIZE_MB"]
 
     @classmethod
     def get_cache_ttl_hours(cls) -> float:
         """Get cache expiration time in hours"""
         try:
-            return float(os.getenv("TELEGRAM_CACHE_TTL_HOURS", "24"))
+            return float(os.getenv("TELEGRAM_CACHE_TTL_HOURS", str(cls._DEFAULTS["CACHE_TTL_HOURS"])))
         except ValueError:
-            return 24.0
+            return cls._DEFAULTS["CACHE_TTL_HOURS"]
 
     @classmethod
     def get_cache_dir(cls) -> str:
         """Get cache directory path"""
-        return os.getenv("TELEGRAM_CACHE_DIR", "cache/thumbnails")
+        return os.getenv("TELEGRAM_CACHE_DIR", cls._DEFAULTS["CACHE_DIR"])
 
     @classmethod
     def should_send_thumbnail_on_error(cls) -> bool:
@@ -249,6 +263,25 @@ class TelegramThumbnailConfig:
     def get_api_timeout(cls) -> float:
         """Get Telegram API timeout in seconds"""
         try:
-            return float(os.getenv("TELEGRAM_API_TIMEOUT", "10.0"))
+            return float(os.getenv("TELEGRAM_API_TIMEOUT", str(cls._DEFAULTS["API_TIMEOUT"])))
         except ValueError:
-            return 10.0
+            return cls._DEFAULTS["API_TIMEOUT"]
+
+    @classmethod
+    def get_all_defaults(cls) -> dict:
+        """Get all default configuration values for documentation"""
+        return cls._DEFAULTS.copy()
+
+    @classmethod
+    def get_config_report(cls) -> dict:
+        """Get a report of all current configuration values (useful for debugging)"""
+        return {
+            "enabled": cls.is_enabled(),
+            "thumbnail_size": f"{cls.get_width()}x{cls.get_height()}",
+            "quality": cls.get_quality(),
+            "cache_dir": cls.get_cache_dir(),
+            "cache_max_size_mb": cls.get_cache_max_size_mb(),
+            "cache_ttl_hours": cls.get_cache_ttl_hours(),
+            "api_timeout": cls.get_api_timeout(),
+            "send_on_error": cls.should_send_thumbnail_on_error()
+        }
