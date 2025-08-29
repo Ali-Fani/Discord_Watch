@@ -162,7 +162,7 @@ async def init():
         # Register Telegram notification provider if token is available
         if os.getenv("TELEGRAM_BOT_TOKEN"):
             client.notification_manager.register_provider(
-                "telegram", TelegramNotificationProvider()
+                "telegram", TelegramNotificationProvider(db_collection=db.user_telegram_cache)
             )
 
         # Initialize all providers

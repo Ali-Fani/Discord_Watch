@@ -180,3 +180,75 @@ def infer_action_type(message: str) -> str:
     # Default fallback
     else:
         return ActionType.DEFAULT
+
+
+class TelegramThumbnailConfig:
+    """
+    Configuration class for Telegram profile picture thumbnail generation.
+
+    All settings can be configured via environment variables for easy customization.
+    """
+
+    @classmethod
+    def is_enabled(cls) -> bool:
+        """Check if thumbnail generation is enabled"""
+        return os.getenv("TELEGRAM_THUMBNAIL_ENABLED", "true").lower() == "true"
+
+    @classmethod
+    def get_width(cls) -> int:
+        """Get thumbnail width in pixels"""
+        try:
+            return int(os.getenv("TELEGRAM_THUMBNAIL_WIDTH", "128"))
+        except ValueError:
+            return 128
+
+    @classmethod
+    def get_height(cls) -> int:
+        """Get thumbnail height in pixels"""
+        try:
+            return int(os.getenv("TELEGRAM_THUMBNAIL_HEIGHT", "128"))
+        except ValueError:
+            return 128
+
+    @classmethod
+    def get_quality(cls) -> int:
+        """Get JPEG quality (1-95, higher = better quality but larger file)"""
+        try:
+            quality = int(os.getenv("TELEGRAM_THUMBNAIL_QUALITY", "85"))
+            return max(1, min(95, quality))  # Clamp between 1 and 95
+        except ValueError:
+            return 85
+
+    @classmethod
+    def get_cache_max_size_mb(cls) -> int:
+        """Get maximum cache size in MB"""
+        try:
+            return int(os.getenv("TELEGRAM_CACHE_MAX_SIZE_MB", "500"))
+        except ValueError:
+            return 500
+
+    @classmethod
+    def get_cache_ttl_hours(cls) -> float:
+        """Get cache expiration time in hours"""
+        try:
+            return float(os.getenv("TELEGRAM_CACHE_TTL_HOURS", "24"))
+        except ValueError:
+            return 24.0
+
+    @classmethod
+    def get_cache_dir(cls) -> str:
+        """Get cache directory path"""
+        return os.getenv("TELEGRAM_CACHE_DIR", "cache/thumbnails")
+
+    @classmethod
+    def should_send_thumbnail_on_error(cls) -> bool:
+        """Check if cached thumbnails should be sent when API fails"""
+        return os.getenv("TELEGRAM_SEND_THUMBNAIL_ON_ERROR", "true").lower() == "true"
+
+    @classmethod
+    def get_api_timeout(cls) -> float:
+        """Get Telegram API timeout in seconds"""
+        try:
+            return float(os.getenv("TELEGRAM_API_TIMEOUT", "10.0"))
+        except ValueError:
+            return 10.0

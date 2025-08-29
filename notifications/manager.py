@@ -51,3 +51,18 @@ class NotificationManager:
         for provider_name, user_id in user_notifications.items():
             results[provider_name] = await self.send_notification(provider_name, user_id, message, user_context, action_type, voice_channel_id, server_id)
         return results
+
+    async def cleanup_provider_cache(self, provider_name: str) -> Optional[Dict[str, int]]:
+        """Clean up cache for a specific provider if it has a cleanup method"""
+        provider = self.providers.get(provider_name)
+        if provider and hasattr(provider, 'profile_picture_manager') and provider.profile_picture_manager:
+            if hasattr(provider.profile_picture_manager, 'cleanup_cache'):
+                return await provider.profile_picture_manager.cleanup_cache()
+        return None
+
+    async def cleanup_all_provider_caches(self) -> Dict[str, Optional[Dict[str, int]]]:
+        """Clean up caches for all providers"""
+        results = {}
+        for provider_name in self.providers.keys():
+            results[provider_name] = await self.cleanup_provider_cache(provider_name)
+        return results
